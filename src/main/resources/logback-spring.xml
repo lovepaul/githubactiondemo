@@ -1,0 +1,53 @@
+<configuration>
+    <!-- 设置扫描配置文件变化 -->
+    <configurationScan>true</configurationScan>
+    <!-- 定义日志路径，基于 spring.application.name 动态设置 -->
+    <property name="LOG_HOME" value="/var/log/${spring.application.name}" />
+
+    <!-- 控制台日志 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 文件日志 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/${spring.application.name}.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 设置日志滚动的文件名格式 -->
+            <fileNamePattern>${LOG_HOME}/archived/%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 单个日志文件大小上限 -->
+            <maxFileSize>20MB</maxFileSize>
+            <!-- 保留的最大历史归档文件数量 -->
+            <maxHistory>30</maxHistory>
+            <!-- 设置总日志大小上限 -->
+            <totalSizeCap>10GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 环境特定配置 -->
+    <springProfile name="local">
+        <!-- 本地环境：打印到控制台 -->
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
+
+    <springProfile name="test">
+        <!-- 测试环境：打印到文件 -->
+        <root level="INFO">
+            <appender-ref ref="FILE" />
+        </root>
+    </springProfile>
+
+    <springProfile name="prod">
+        <!-- 生产环境：打印到文件并限制日志级别 -->
+        <root level="WARN">
+            <appender-ref ref="FILE" />
+        </root>
+    </springProfile>
+</configuration>
