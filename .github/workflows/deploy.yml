@@ -55,13 +55,26 @@ jobs:
         run: |
           ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }} "mkdir -p /home/${{ secrets.PROD_EC2_USER }}"
 
-      # 7. 上传 JAR 文件到目标服务器
+      # 7. 安装 Java 环境（如果缺失）
+      - name: Install Java on Remote Server
+        run: |
+          ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }} << EOF
+            if ! command -v java &> /dev/null; then
+              echo "Java not found. Installing Java..."
+              sudo apt-get update -y
+              sudo apt-get install -y openjdk-17-jdk
+            else
+              echo "Java is already installed."
+            fi
+          EOF
+
+      # 8. 上传 JAR 文件到目标服务器
       - name: Upload JAR to Server
         run: |
           echo "Deploying to server with USER=${{ secrets.PROD_EC2_USER }} and HOST=${{ secrets.PROD_EC2_HOST }}"
           scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}:/home/${{ secrets.PROD_EC2_USER }}/springboot-app.jar
 
-      # 8. 启动 Spring Boot 应用
+      # 9. 启动 Spring Boot 应用
       - name: Start Spring Boot App on Server
         run: |
           ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }} << EOF
@@ -69,7 +82,7 @@ jobs:
             nohup java -jar /home/${{ secrets.PROD_EC2_USER }}/springboot-app.jar > /home/${{ secrets.PROD_EC2_USER }}/app.log 2>&1 &
           EOF
 
-      # 9. 清理 SSH 私钥
+      # 10. 清理 SSH 私钥
       - name: Clean up SSH Key
         run: |
           rm -f id_rsa
