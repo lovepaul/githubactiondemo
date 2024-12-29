@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - test-branch # 如果需要在测试环境触发
+      - test-branch # 根据不同分支触发不同的环境
 
 env:
   APP_JAR: build/libs/*.jar
@@ -13,6 +13,9 @@ jobs:
   deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
+
+    # 使用 GitHub Environments
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'test' }}
 
     steps:
       # 1. 检出代码
@@ -26,41 +29,32 @@ jobs:
           java-version: 17
           distribution: zulu
 
-      # 3. 缓存 Gradle 构建依赖
-      - name: Cache Gradle packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      # 4. 构建项目
+      # 3. 构建项目
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # 5. 配置 SSH 私钥文件
+      # 4. 配置 SSH 私钥文件
       - name: Configure SSH Key
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > id_rsa
           chmod 600 id_rsa
 
-      # 6. 使用 scp 上传 JAR 文件到服务器
+      # 5. 部署到服务器
       - name: Upload JAR to Server
         run: |
-          echo "Deploying to server with USER=${{ secrets.PROD_EC2_HOST }} and HOST=${{ secrets.PROD_EC2_HOST }}"
-          scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} ${{ secrets.PROD_EC2_HOST }}@${{ secrets.PROD_EC2_HOST }}:/home/${{ secrets.PROD_EC2_HOST }}/springboot-app.jar
+          echo "Deploying to server with USER=${{ secrets.PROD_EC2_USER }} and HOST=${{ secrets.PROD_EC2_HOST }}"
+          scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}:/home/${{ secrets.PROD_EC2_USER }}/springboot-app.jar
 
-      # 7. 启动 Spring Boot 应用
+      # 6. 启动 Spring Boot 应用
       - name: Start Spring Boot App on Server
         run: |
-          echo "Starting application on server with USER=${{ secrets.PROD_EC2_HOST }} and HOST=${{ secrets.PROD_EC2_HOST }}"
-          ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_HOST }}@${{ secrets.PROD_EC2_HOST }} << EOF
+          echo "Starting application on server with USER=${{ secrets.PROD_EC2_USER }} and HOST=${{ secrets.PROD_EC2_HOST }}"
+          ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }} << EOF
             pkill -f 'java -jar' || true
-            nohup java -jar /home/${{ secrets.PROD_EC2_HOST }}/springboot-app.jar > /home/${{ secrets.PROD_EC2_HOST }}/app.log 2>&1 &
+            nohup java -jar /home/${{ secrets.PROD_EC2_USER }}/springboot-app.jar > /home/${{ secrets.PROD_EC2_USER }}/app.log 2>&1 &
           EOF
 
-      # 8. 清理私钥文件
+      # 7. 清理 SSH 私钥
       - name: Clean up SSH Key
         run: |
           rm -f id_rsa
