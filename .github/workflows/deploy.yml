@@ -39,13 +39,19 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > id_rsa
           chmod 600 id_rsa
 
-      # 5. 部署到服务器
+      # 5. 确保目标目录存在
+      - name: Ensure Target Directory Exists
+        run: |
+          echo "Ensuring target directory exists on HOST=${{ secrets.PROD_EC2_HOST }} with USER=${{ secrets.PROD_EC2_USER }}"
+          ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }} "mkdir -p /home/${{ secrets.PROD_EC2_USER }}"
+
+      # 6. 上传 JAR 文件到目标服务器
       - name: Upload JAR to Server
         run: |
           echo "Deploying to server with USER=${{ secrets.PROD_EC2_USER }} and HOST=${{ secrets.PROD_EC2_HOST }}"
           scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} ${{ secrets.PROD_EC2_USER }}@${{ secrets.PROD_EC2_HOST }}:/home/${{ secrets.PROD_EC2_USER }}/springboot-app.jar
 
-      # 6. 启动 Spring Boot 应用
+      # 7. 启动 Spring Boot 应用
       - name: Start Spring Boot App on Server
         run: |
           echo "Starting application on server with USER=${{ secrets.PROD_EC2_USER }} and HOST=${{ secrets.PROD_EC2_HOST }}"
@@ -54,7 +60,7 @@ jobs:
             nohup java -jar /home/${{ secrets.PROD_EC2_USER }}/springboot-app.jar > /home/${{ secrets.PROD_EC2_USER }}/app.log 2>&1 &
           EOF
 
-      # 7. 清理 SSH 私钥
+      # 8. 清理 SSH 私钥
       - name: Clean up SSH Key
         run: |
           rm -f id_rsa
