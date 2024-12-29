@@ -1,4 +1,4 @@
-name: Deploy Spring Boot to EC2
+name: Deploy Spring Boot to Server
 
 on:
   push:
@@ -42,29 +42,32 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # 5. 安装 sshpass
-      - name: Install sshpass
+      # 5. 配置 SSH 私钥文件
+      - name: Configure SSH Key
         run: |
-          sudo apt-get update
-          sudo apt-get install -y sshpass
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > id_rsa
+          chmod 600 id_rsa
 
-      # 6. 使用 rsync 部署到 EC2
-      - name: Deploy to EC2 using rsync with password
+      # 6. 使用 scp 上传 JAR 文件到服务器
+      - name: Upload JAR to Server
         env:
-          HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
-          USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
-          PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PASSWORD || secrets.TEST_EC2_PASSWORD }}
+          HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_HOST || secrets.TEST_SERVER_HOST }}
+          USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_USER || secrets.TEST_SERVER_USER }}
         run: |
-          sshpass -p "$PASSWORD" rsync -avz -e "ssh -o StrictHostKeyChecking=no" ${{ env.APP_JAR }} $USER@$HOST:/home/ec2-user/springboot-app.jar
+          scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} $USER@$HOST:/home/$USER/springboot-app.jar
 
       # 7. 启动 Spring Boot 应用
-      - name: Start Spring Boot App on EC2
+      - name: Start Spring Boot App on Server
         env:
-          HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
-          USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
-          PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PASSWORD || secrets.TEST_EC2_PASSWORD }}
+          HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_HOST || secrets.TEST_SERVER_HOST }}
+          USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_USER || secrets.TEST_SERVER_USER }}
         run: |
-          sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no $USER@$HOST << EOF
+          ssh -i id_rsa -o StrictHostKeyChecking=no $USER@$HOST << EOF
             pkill -f 'java -jar' || true
-            nohup java -jar /home/ec2-user/springboot-app.jar > /etc/applog/app.log 2>&1 &
+            nohup java -jar /home/$USER/springboot-app.jar > /home/$USER/app.log 2>&1 &
           EOF
+
+      # 8. 清理私钥文件
+      - name: Clean up SSH Key
+        run: |
+          rm -f id_rsa
