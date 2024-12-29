@@ -14,7 +14,7 @@ jobs:
     name: Build and Deploy
     runs-on: ubuntu-latest
 
-    # 1. 选择环境
+    # 选择环境
     environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'test' }}
 
     steps:
@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
-          distribution: zulu # 或者选择你需要的 Java 发行版，如 zulu、adopt
+          distribution: zulu
 
       # 3. 缓存 Gradle 构建依赖
       - name: Cache Gradle packages
@@ -42,29 +42,29 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # 5. 部署到环境
-      - name: Deploy to EC2 using rsync
+      # 5. 安装 sshpass
+      - name: Install sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      # 6. 使用 rsync 部署到 EC2
+      - name: Deploy to EC2 using rsync with password
         env:
           HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
           USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
-          KEY: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PRIVATE_KEY || secrets.TEST_EC2_PRIVATE_KEY }}
+          PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PASSWORD || secrets.TEST_EC2_PASSWORD }}
         run: |
-          echo "$KEY" > key.pem
-          chmod 600 key.pem
-          rsync -e "ssh -i key.pem -o StrictHostKeyChecking=no" -avz ${{ env.APP_JAR }} $USER@$HOST:/home/ec2-user/springboot-app.jar
-          rm -f key.pem
+          sshpass -p "$PASSWORD" rsync -avz -e "ssh -o StrictHostKeyChecking=no" ${{ env.APP_JAR }} $USER@$HOST:/home/ec2-user/springboot-app.jar
 
-      # 6. 启动应用
+      # 7. 启动 Spring Boot 应用
       - name: Start Spring Boot App on EC2
         env:
           HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
           USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
-          KEY: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PRIVATE_KEY || secrets.TEST_EC2_PRIVATE_KEY }}
+          PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PASSWORD || secrets.TEST_EC2_PASSWORD }}
         run: |
-          echo "$KEY" > key.pem
-          chmod 600 key.pem
-          ssh -i key.pem -o StrictHostKeyChecking=no $USER@$HOST << EOF
+          sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no $USER@$HOST << EOF
             pkill -f 'java -jar' || true
             nohup java -jar /home/ec2-user/springboot-app.jar > /etc/applog/app.log 2>&1 &
           EOF
-          rm -f key.pem
