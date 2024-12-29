@@ -54,6 +54,7 @@ jobs:
           HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_HOST || secrets.TEST_SERVER_HOST }}
           USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_USER || secrets.TEST_SERVER_USER }}
         run: |
+          echo "Deploying to server with USER=$USER and HOST=$HOST"
           scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} $USER@$HOST:/home/$USER/springboot-app.jar
 
       # 7. 启动 Spring Boot 应用
@@ -62,6 +63,7 @@ jobs:
           HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_HOST || secrets.TEST_SERVER_HOST }}
           USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_SERVER_USER || secrets.TEST_SERVER_USER }}
         run: |
+          echo "Starting application on server with USER=$USER and HOST=$HOST"
           ssh -i id_rsa -o StrictHostKeyChecking=no $USER@$HOST << EOF
             pkill -f 'java -jar' || true
             nohup java -jar /home/$USER/springboot-app.jar > /home/$USER/app.log 2>&1 &
