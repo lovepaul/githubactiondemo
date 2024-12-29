@@ -42,22 +42,28 @@ jobs:
         run: ./gradlew clean build -x test
 
       # 5. 部署到环境
-      - name: Deploy to EC2
-        uses: appleboy/scp-action@v0.2.4
-        with:
-          host: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
-          username: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
-          key: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PRIVATE_KEY || secrets.TEST_EC2_PRIVATE_KEY }}
-          source: ${{ env.APP_JAR }}
-          target: /home/ec2-user/springboot-app.jar
+      - name: Deploy to EC2 using rsync
+        env:
+          HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
+          USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
+          KEY: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PRIVATE_KEY || secrets.TEST_EC2_PRIVATE_KEY }}
+        run: |
+          echo "$KEY" > key.pem
+          chmod 600 key.pem
+          rsync -e "ssh -i key.pem -o StrictHostKeyChecking=no" -avz ${{ env.APP_JAR }} $USER@$HOST:/home/ec2-user/springboot-app.jar
+          rm -f key.pem
 
       # 6. 启动应用
-      - name: Start Spring Boot App
-        uses: appleboy/ssh-action@v0.1.8
-        with:
-          host: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
-          username: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
-          key: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PRIVATE_KEY || secrets.TEST_EC2_PRIVATE_KEY }}
-          script: |
+      - name: Start Spring Boot App on EC2
+        env:
+          HOST: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_HOST || secrets.TEST_EC2_HOST }}
+          USER: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_USER || secrets.TEST_EC2_USER }}
+          KEY: ${{ github.ref == 'refs/heads/main' && secrets.PROD_EC2_PRIVATE_KEY || secrets.TEST_EC2_PRIVATE_KEY }}
+        run: |
+          echo "$KEY" > key.pem
+          chmod 600 key.pem
+          ssh -i key.pem -o StrictHostKeyChecking=no $USER@$HOST << EOF
             pkill -f 'java -jar' || true
             nohup java -jar /home/ec2-user/springboot-app.jar > /etc/applog/app.log 2>&1 &
+          EOF
+          rm -f key.pem
