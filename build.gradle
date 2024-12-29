@@ -23,10 +23,19 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
-
-
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// 禁用默认的 plain JAR 任务
+tasks.withType(Jar) {
+    enabled = false
+}
+
+// 确保仅生成可运行的 bootJar
+bootJar {
+    enabled = true
+    archiveFileName = "demo-0.0.1-SNAPSHOT.jar" // 自定义输出文件名
 }
