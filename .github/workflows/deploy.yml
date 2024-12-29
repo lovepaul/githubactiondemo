@@ -27,6 +27,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
+          distribution: zulu # 或者选择你需要的 Java 发行版，如 zulu、adopt
 
       # 3. 缓存 Gradle 构建依赖
       - name: Cache Gradle packages
