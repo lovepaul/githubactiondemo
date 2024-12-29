@@ -48,16 +48,16 @@ jobs:
       # 6. 使用 scp 上传 JAR 文件到服务器
       - name: Upload JAR to Server
         run: |
-          echo "Deploying to server with USER=${{ secrets.SERVER_USER }} and HOST=${{ secrets.SERVER_HOST }}"
-          scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/${{ secrets.SERVER_USER }}/springboot-app.jar
+          echo "Deploying to server with USER=${{ secrets.PROD_EC2_HOST }} and HOST=${{ secrets.PROD_EC2_HOST }}"
+          scp -i id_rsa -o StrictHostKeyChecking=no ${{ env.APP_JAR }} ${{ secrets.PROD_EC2_HOST }}@${{ secrets.PROD_EC2_HOST }}:/home/${{ secrets.PROD_EC2_HOST }}/springboot-app.jar
 
       # 7. 启动 Spring Boot 应用
       - name: Start Spring Boot App on Server
         run: |
-          echo "Starting application on server with USER=${{ secrets.SERVER_USER }} and HOST=${{ secrets.SERVER_HOST }}"
-          ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+          echo "Starting application on server with USER=${{ secrets.PROD_EC2_HOST }} and HOST=${{ secrets.PROD_EC2_HOST }}"
+          ssh -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.PROD_EC2_HOST }}@${{ secrets.PROD_EC2_HOST }} << EOF
             pkill -f 'java -jar' || true
-            nohup java -jar /home/${{ secrets.SERVER_USER }}/springboot-app.jar > /home/${{ secrets.SERVER_USER }}/app.log 2>&1 &
+            nohup java -jar /home/${{ secrets.PROD_EC2_HOST }}/springboot-app.jar > /home/${{ secrets.PROD_EC2_HOST }}/app.log 2>&1 &
           EOF
 
       # 8. 清理私钥文件
